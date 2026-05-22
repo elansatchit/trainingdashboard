@@ -1,35 +1,55 @@
 #!/usr/bin/env python3
 """
 Pulls yesterday's wellness data from Garmin Connect and upserts into Neon DB.
-Requires env vars: GARMIN_EMAIL, GARMIN_PASSWORD, DATABASE_URL
+
+Auth (preferred): set GARMIN_TOKENSTORE secret (base64-encoded token dir).
+  Generate it once locally with: python scripts/garmin_get_token.py
+
+Auth (fallback): GARMIN_EMAIL + GARMIN_PASSWORD (may hit 429 from CI IPs).
 """
 
+import base64
+import json
 import os
 import sys
+import tempfile
 from datetime import date, timedelta
 
 try:
     from garminconnect import Garmin
 except ImportError:
-    print("ERROR: garminconnect not installed. Run: pip install garminconnect==0.2.22")
+    print("ERROR: garminconnect not installed.")
     sys.exit(1)
 
 try:
     import psycopg2
 except ImportError:
-    print("ERROR: psycopg2 not installed. Run: pip install psycopg2-binary")
+    print("ERROR: psycopg2 not installed.")
     sys.exit(1)
 
-email = os.environ["GARMIN_EMAIL"]
-password = os.environ["GARMIN_PASSWORD"]
 db_url = os.environ["DATABASE_URL"]
-
 target = (date.today() - timedelta(days=1)).isoformat()
 print(f"Syncing Garmin wellness for {target}")
 
 # --- Connect to Garmin ---
-client = Garmin(email, password)
-client.login()
+tokenstore_b64 = os.environ.get("GARMIN_TOKENSTORE")
+if tokenstore_b64:
+    # Restore token files to a temp dir and load without re-logging in
+    token_dir = tempfile.mkdtemp()
+    files = json.loads(base64.b64decode(tokenstore_b64))
+    for name, content in files.items():
+        with open(os.path.join(token_dir, name), "w") as f:
+            f.write(content)
+    client = Garmin()
+    client.garth.load(token_dir)
+    print("  Auth: using stored OAuth tokens")
+else:
+    # Fallback: password login (risks 429 from shared CI IPs)
+    email = os.environ["GARMIN_EMAIL"]
+    password = os.environ["GARMIN_PASSWORD"]
+    client = Garmin(email, password)
+    client.login()
+    print("  Auth: password login")
 
 sleep_hrs = None
 hrv = None
@@ -61,7 +81,6 @@ except Exception as e:
 try:
     bb = client.get_body_battery(target, target)
     if bb:
-        # "charged" = max battery reached after sleep
         charged = next((r.get("charged") for r in bb if r.get("charged") is not None), None)
         readiness = charged
     print(f"  Body battery: {readiness}")

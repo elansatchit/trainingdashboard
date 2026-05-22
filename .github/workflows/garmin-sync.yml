@@ -21,6 +21,7 @@ jobs:
       - name: Sync Garmin wellness
         run: python scripts/garmin_sync.py
         env:
-          GARMIN_EMAIL:    ${{ secrets.GARMIN_EMAIL }}
-          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
-          DATABASE_URL:    ${{ secrets.DATABASE_URL }}
+          GARMIN_TOKENSTORE: ${{ secrets.GARMIN_TOKENSTORE }}
+          GARMIN_EMAIL:      ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD:   ${{ secrets.GARMIN_PASSWORD }}
+          DATABASE_URL:      ${{ secrets.DATABASE_URL }}
