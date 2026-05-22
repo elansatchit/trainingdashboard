@@ -401,12 +401,20 @@ function ChatPanel() {
           return updated;
         });
       }
-    } catch {
+      // If stream closed with no content, show a fallback
+      setMessages((prev) => {
+        const updated = [...prev];
+        if (!updated[assistantIdx]?.content) {
+          updated[assistantIdx] = { role: "assistant", content: "No response received. Please try again." };
+        }
+        return updated;
+      });
+    } catch (err) {
       setMessages((prev) => {
         const updated = [...prev];
         updated[assistantIdx] = {
           role: "assistant",
-          content: "Sorry, something went wrong.",
+          content: `Error: ${err instanceof Error ? err.message : String(err)}`,
         };
         return updated;
       });

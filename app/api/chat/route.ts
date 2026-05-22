@@ -155,6 +155,8 @@ export async function POST(req: NextRequest) {
             const text = chunk.text();
             if (text) controller.enqueue(encoder.encode(text));
           }
+        } catch (err) {
+          controller.enqueue(encoder.encode(`[Error: ${String(err)}]`));
         } finally {
           controller.close();
         }
