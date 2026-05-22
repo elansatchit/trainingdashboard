@@ -34,10 +34,10 @@ async function buildContext(): Promise<string> {
       SELECT date, sport, name, duration_min, distance_km, avg_hr, avg_watts, tss
       FROM activities ORDER BY date ASC
     ` as unknown as Promise<ActivityRow[]>,
-    sql`
+    (sql`
       SELECT date, sleep_hrs, hrv, resting_hr, readiness
       FROM wellness ORDER BY date DESC LIMIT 7
-    ` as unknown as Promise<{ date: string | Date; sleep_hrs: number | null; hrv: number | null; resting_hr: number | null; readiness: number | null }[]>,
+    `.catch(() => [])) as Promise<{ date: string | Date; sleep_hrs: number | null; hrv: number | null; resting_hr: number | null; readiness: number | null }[]>,
   ]);
 
   // CTL/ATL/TSB
@@ -124,40 +124,51 @@ ${wellnessLines.length > 0 ? wellnessLines.join('\n') : 'No wellness data yet.'}
 }
 
 export async function POST(req: NextRequest) {
-  const { messages } = await req.json() as {
-    messages: { role: 'user' | 'assistant'; content: string }[];
-  };
+  try {
+    const { messages } = await req.json() as {
+      messages: { role: 'user' | 'assistant'; content: string }[];
+    };
 
-  const context = await buildContext();
+    const context = await buildContext();
 
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
-    systemInstruction: `You are a triathlon coach assistant with access to this athlete's real training data. Answer questions concisely and specifically using the data provided. Focus on actionable insights.\n\n${context}`,
-  });
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      systemInstruction: `You are a triathlon coach assistant with access to this athlete's real training data. Answer questions concisely and specifically using the data provided. Focus on actionable insights.\n\n${context}`,
+    });
 
-  // Gemini uses "model" not "assistant"
-  const history = messages.slice(0, -1).map((m) => ({
-    role: m.role === 'assistant' ? 'model' : 'user' as 'user' | 'model',
-    parts: [{ text: m.content }],
-  }));
-  const lastMessage = messages.at(-1)!.content;
+    // Gemini uses "model" not "assistant"
+    const history = messages.slice(0, -1).map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user' as 'user' | 'model',
+      parts: [{ text: m.content }],
+    }));
+    const lastMessage = messages.at(-1)!.content;
 
-  const chat = model.startChat({ history });
-  const result = await chat.sendMessageStream(lastMessage);
+    const chat = model.startChat({ history });
+    const result = await chat.sendMessageStream(lastMessage);
 
-  const encoder = new TextEncoder();
-  const readable = new ReadableStream({
-    async start(controller) {
-      for await (const chunk of result.stream) {
-        const text = chunk.text();
-        if (text) controller.enqueue(encoder.encode(text));
-      }
-      controller.close();
-    },
-  });
+    const encoder = new TextEncoder();
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of result.stream) {
+            const text = chunk.text();
+            if (text) controller.enqueue(encoder.encode(text));
+          }
+        } finally {
+          controller.close();
+        }
+      },
+    });
 
-  return new Response(readable, {
-    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-  });
+    return new Response(readable, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
+  } catch (err) {
+    console.error('[chat]', err);
+    return new Response(JSON.stringify({ error: String(err) }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }

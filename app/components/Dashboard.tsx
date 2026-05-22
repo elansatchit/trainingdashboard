@@ -381,6 +381,10 @@ function ChatPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: newMessages }),
       });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Server error ${res.status}: ${errText}`);
+      }
       if (!res.body) throw new Error("No response body");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -415,7 +419,7 @@ function ChatPanel() {
     <div className="bg-slate-900 rounded-xl border border-slate-800 flex flex-col h-96">
       <div className="px-5 pt-4 pb-2 border-b border-slate-800 flex-shrink-0">
         <h2 className="text-base font-semibold">Ask Your Coach</h2>
-        <p className="text-xs text-slate-500">Powered by Claude · uses your real training data</p>
+        <p className="text-xs text-slate-500">Powered by Gemini · uses your real training data</p>
       </div>
       <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3 text-sm">
         {messages.length === 0 && (
