@@ -2,7 +2,7 @@ name: Garmin Wellness Sync
 
 on:
   schedule:
-    - cron: '0 10 * * *'   # 10am UTC = ~6am ET daily
+    - cron: '0 22 * * *'   # 10pm UTC = ~6pm ET daily
   workflow_dispatch:         # allow manual trigger from Actions tab
 
 jobs:

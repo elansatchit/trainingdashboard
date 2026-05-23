@@ -27,7 +27,7 @@ except ImportError:
     sys.exit(1)
 
 db_url = os.environ["DATABASE_URL"]
-target = (date.today() - timedelta(days=1)).isoformat()
+target = date.today().isoformat()
 print(f"Syncing Garmin wellness for {target}")
 
 # --- Restore tokens ---
