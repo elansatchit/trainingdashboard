@@ -89,20 +89,23 @@ try:
 except Exception as e:
     print(f"  HRV fetch failed: {e}")
 
-# --- Body battery (readiness proxy) ---
+# --- User daily summary: body battery + resting HR fallback ---
 try:
-    bb = garth.connectapi(
-        f"/wellness-service/wellness/bodyBattery/query"
-        f"?startDate={target}&endDate={target}"
+    day_summary = garth.connectapi(
+        f"/usersummary-service/usersummary/daily/{display_name}"
+        f"?calendarDate={target}"
     )
-    if bb:
-        charged = next(
-            (r.get("charged") for r in bb if r.get("charged") is not None), None
+    if day_summary:
+        readiness = (
+            day_summary.get("bodyBatteryChargedValue")
+            or day_summary.get("maxBodyBatteryLevel")
         )
-        readiness = charged
-    print(f"  Body battery: {readiness}")
+        # Use summary resting HR if sleep endpoint didn't provide it
+        if resting_hr is None:
+            resting_hr = day_summary.get("restingHeartRateValue")
+    print(f"  Body battery: {readiness}, Resting HR: {resting_hr}")
 except Exception as e:
-    print(f"  Body battery fetch failed: {e}")
+    print(f"  User summary fetch failed: {e}")
 
 # --- Upsert into DB ---
 conn = psycopg2.connect(db_url)
