@@ -49,8 +49,10 @@ print("  Auth: using stored OAuth tokens")
 display_name = ""
 try:
     profile = garth.connectapi("/userprofile-service/socialProfile")
-    display_name = profile.get("displayName", "")
-    print(f"  User: {display_name}")
+    print(f"  Profile keys: {list(profile.keys()) if profile else 'None'}")
+    # displayName may be None even if the key exists — use `or`
+    display_name = profile.get("displayName") or profile.get("userName") or ""
+    print(f"  User: {display_name!r}")
 except Exception as e:
     print(f"  Could not get display name: {e}")
 
@@ -60,11 +62,12 @@ resting_hr = None
 readiness = None
 
 # --- Sleep + resting HR ---
+# Embed params in URL string to avoid garth kwargs issues
 if display_name:
     try:
         sleep_data = garth.connectapi(
-            f"/wellness-service/wellness/dailySleepData/{display_name}",
-            params={"date": target, "nonSleepBufferMinutes": 60},
+            f"/wellness-service/wellness/dailySleepData/{display_name}"
+            f"?date={target}&nonSleepBufferMinutes=60"
         )
         dto = (sleep_data or {}).get("dailySleepDTO", {})
         secs = dto.get("sleepTimeSeconds")
@@ -89,8 +92,8 @@ except Exception as e:
 # --- Body battery (readiness proxy) ---
 try:
     bb = garth.connectapi(
-        "/wellness-service/wellness/bodyBattery/query",
-        params={"startDate": target, "endDate": target},
+        f"/wellness-service/wellness/bodyBattery/query"
+        f"?startDate={target}&endDate={target}"
     )
     if bb:
         charged = next(
