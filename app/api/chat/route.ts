@@ -37,7 +37,7 @@ async function buildContext(): Promise<string> {
     (sql`
       SELECT date, sleep_hrs, deep_sleep_min, light_sleep_min, rem_sleep_min,
              awake_min, spo2, respiration, sleep_stress, hrv, resting_hr, readiness
-      FROM wellness ORDER BY date DESC LIMIT 7
+      FROM wellness ORDER BY date DESC LIMIT 30
     `.catch(() => [])) as Promise<{
       date: string | Date;
       sleep_hrs: number | null;
@@ -77,37 +77,35 @@ async function buildContext(): Promise<string> {
   const tsb = ctl - atl;
   const tsbStatus = tsb > 5 ? 'Fresh' : tsb >= -10 ? 'Neutral' : tsb >= -25 ? 'In Training' : 'Overreached';
 
-  // Recent 14 days of activities
-  const fourteenAgo = new Date(Date.now() - 14 * 86400 * 1000).toISOString().slice(0, 10);
-  const recent = (rows as ActivityRow[])
-    .filter((r) => toDateStr(r.date) >= fourteenAgo)
-    .map((r) => {
-      const parts = [toDateStr(r.date), r.sport, r.name, fmtMins(r.duration_min)];
-      if (r.distance_km) parts.push(`${r.distance_km}km`);
-      if (r.avg_hr) parts.push(`${r.avg_hr}bpm`);
-      if (r.avg_watts) parts.push(`${Math.round(r.avg_watts as number)}W`);
-      if (r.tss) parts.push(`TSS:${r.tss}`);
-      return parts.join(' | ');
-    });
+  // All activities formatted individually, newest first
+  const allActivities = [...(rows as ActivityRow[])].reverse().map((r) => {
+    const parts = [toDateStr(r.date), r.sport, r.name, fmtMins(r.duration_min)];
+    if (r.distance_km) parts.push(`${r.distance_km}km`);
+    if (r.avg_hr) parts.push(`${r.avg_hr}bpm`);
+    if (r.avg_watts) parts.push(`${Math.round(r.avg_watts as number)}W`);
+    if (r.tss) parts.push(`TSS:${r.tss}`);
+    return parts.join(' | ');
+  });
 
-  // Weekly volume last 4 weeks
-  const fourWeeksAgo = new Date(Date.now() - 28 * 86400 * 1000).toISOString().slice(0, 10);
-  const weekMap: Record<string, { swim: number; bike: number; run: number }> = {};
+  // Weekly volume — all weeks on record
+  const weekMap: Record<string, { swim: number; bike: number; run: number; tss: number }> = {};
   for (const row of rows) {
     const d = toDateStr(row.date);
-    if (d < fourWeeksAgo) continue;
     const dow = new Date(d + 'T00:00:00Z').getUTCDay();
     const offset = dow === 0 ? 6 : dow - 1;
     const mon = new Date(d + 'T00:00:00Z');
     mon.setUTCDate(mon.getUTCDate() - offset);
     const wk = mon.toISOString().slice(0, 10);
-    if (!weekMap[wk]) weekMap[wk] = { swim: 0, bike: 0, run: 0 };
+    if (!weekMap[wk]) weekMap[wk] = { swim: 0, bike: 0, run: 0, tss: 0 };
     const sport = row.sport as 'swim' | 'bike' | 'run';
     if (sport in weekMap[wk]) weekMap[wk][sport] += row.duration_min ?? 0;
+    weekMap[wk].tss += row.tss ?? 0;
   }
   const weeklyLines = Object.entries(weekMap)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([wk, v]) => `Week of ${wk}: swim ${fmtMins(v.swim)}, bike ${fmtMins(v.bike)}, run ${fmtMins(v.run)}`);
+    .map(([wk, v]) =>
+      `Week of ${wk}: swim ${fmtMins(v.swim)}, bike ${fmtMins(v.bike)}, run ${fmtMins(v.run)}, TSS:${Math.round(v.tss)}`
+    );
 
   // Wellness
   const wellnessLines = wellnessRows.map((w) => {
@@ -128,19 +126,20 @@ async function buildContext(): Promise<string> {
 
   return `Today: ${todayStr}
 Athlete goal: Ironman triathlon
+Total activities on record: ${rows.length}
 
 CURRENT FITNESS (TrainingPeaks model):
 CTL (Fitness): ${ctl.toFixed(1)}
 ATL (Fatigue): ${atl.toFixed(1)}
 TSB (Form): ${tsb >= 0 ? '+' : ''}${tsb.toFixed(1)} — ${tsbStatus}
 
-RECENT ACTIVITIES (last 14 days):
-${recent.length > 0 ? recent.join('\n') : 'None.'}
+ALL ACTIVITIES (newest first):
+${allActivities.length > 0 ? allActivities.join('\n') : 'None.'}
 
-WEEKLY TRAINING VOLUME (last 4 weeks):
+WEEKLY TRAINING VOLUME (all weeks on record):
 ${weeklyLines.length > 0 ? weeklyLines.join('\n') : 'No data.'}
 
-RECENT WELLNESS (Garmin):
+RECENT WELLNESS — last 30 days (Garmin):
 ${wellnessLines.length > 0 ? wellnessLines.join('\n') : 'No wellness data yet.'}`;
 }
 
