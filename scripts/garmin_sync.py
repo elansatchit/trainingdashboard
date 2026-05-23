@@ -96,16 +96,9 @@ try:
         f"?calendarDate={target}"
     )
     if day_summary:
-        # Debug: print all battery-related fields
-        batt_fields = {k: v for k, v in day_summary.items() if "attery" in k or "esting" in k.lower()}
-        print(f"  Battery/HR fields: {batt_fields}")
-        readiness = (
-            day_summary.get("maxBodyBatteryLevel")
-            or day_summary.get("bodyBatteryChargedValue")
-        )
-        # Use summary resting HR if sleep endpoint didn't provide it
+        readiness = day_summary.get("bodyBatteryHighestValue")
         if resting_hr is None:
-            resting_hr = day_summary.get("restingHeartRateValue")
+            resting_hr = day_summary.get("restingHeartRate")
     print(f"  Body battery: {readiness}, Resting HR: {resting_hr}")
 except Exception as e:
     print(f"  User summary fetch failed: {e}")
