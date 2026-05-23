@@ -35,9 +35,23 @@ async function buildContext(): Promise<string> {
       FROM activities ORDER BY date ASC
     ` as unknown as Promise<ActivityRow[]>,
     (sql`
-      SELECT date, sleep_hrs, hrv, resting_hr, readiness
+      SELECT date, sleep_hrs, deep_sleep_min, light_sleep_min, rem_sleep_min,
+             awake_min, spo2, respiration, sleep_stress, hrv, resting_hr, readiness
       FROM wellness ORDER BY date DESC LIMIT 7
-    `.catch(() => [])) as Promise<{ date: string | Date; sleep_hrs: number | null; hrv: number | null; resting_hr: number | null; readiness: number | null }[]>,
+    `.catch(() => [])) as Promise<{
+      date: string | Date;
+      sleep_hrs: number | null;
+      deep_sleep_min: number | null;
+      light_sleep_min: number | null;
+      rem_sleep_min: number | null;
+      awake_min: number | null;
+      spo2: number | null;
+      respiration: number | null;
+      sleep_stress: number | null;
+      hrv: number | null;
+      resting_hr: number | null;
+      readiness: number | null;
+    }[]>,
   ]);
 
   // CTL/ATL/TSB
@@ -99,10 +113,17 @@ async function buildContext(): Promise<string> {
   const wellnessLines = wellnessRows.map((w) => {
     const parts = [`${toDateStr(w.date)}:`];
     if (w.sleep_hrs != null) parts.push(`sleep ${w.sleep_hrs}h`);
+    if (w.deep_sleep_min != null) parts.push(`deep ${w.deep_sleep_min}m`);
+    if (w.light_sleep_min != null) parts.push(`light ${w.light_sleep_min}m`);
+    if (w.rem_sleep_min != null) parts.push(`REM ${w.rem_sleep_min}m`);
+    if (w.awake_min != null) parts.push(`awake ${w.awake_min}m`);
+    if (w.spo2 != null) parts.push(`SpO2 ${w.spo2}%`);
+    if (w.respiration != null) parts.push(`resp ${w.respiration}brpm`);
+    if (w.sleep_stress != null) parts.push(`sleep stress ${w.sleep_stress}`);
     if (w.hrv != null) parts.push(`HRV ${w.hrv}ms`);
     if (w.resting_hr != null) parts.push(`resting HR ${w.resting_hr}bpm`);
     if (w.readiness != null) parts.push(`body battery ${w.readiness}`);
-    return parts.join(' ');
+    return parts.join(' | ');
   });
 
   return `Today: ${todayStr}
