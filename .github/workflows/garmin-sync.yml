@@ -16,7 +16,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install "garth<0.5" garminconnect psycopg2-binary
+        run: pip install "garth<0.5" psycopg2-binary
 
       - name: Sync Garmin wellness
         run: python scripts/garmin_sync.py
