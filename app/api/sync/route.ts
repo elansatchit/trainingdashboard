@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 
 const STRAVA_TOKEN_URL = 'https://www.strava.com/oauth/token';
@@ -75,16 +75,23 @@ async function fetchAllActivities(
   return all;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const sql = neon(process.env.DATABASE_URL!);
     const accessToken = await getAccessToken();
+    const full = new URL(req.url).searchParams.get('full') === 'true';
 
-    // Incremental: start from the most recent activity in DB, fall back to 90 days
-    const [row] = await sql`SELECT MAX(date) as max_date FROM activities`;
-    const after = row?.max_date
-      ? Math.floor(new Date(row.max_date as string).getTime() / 1000)
-      : Math.floor(Date.now() / 1000) - 90 * 24 * 3600;
+    let after: number;
+    if (full) {
+      // Full backfill: fetch everything from the beginning of Strava history
+      after = 0;
+    } else {
+      // Incremental: start from the most recent activity in DB, fall back to 90 days
+      const [row] = await sql`SELECT MAX(date) as max_date FROM activities`;
+      after = row?.max_date
+        ? Math.floor(new Date(row.max_date as string).getTime() / 1000)
+        : Math.floor(Date.now() / 1000) - 90 * 24 * 3600;
+    }
 
     const activities = await fetchAllActivities(accessToken, after);
 
