@@ -97,8 +97,8 @@ try:
     )
     if day_summary:
         readiness = (
-            day_summary.get("bodyBatteryChargedValue")
-            or day_summary.get("maxBodyBatteryLevel")
+            day_summary.get("maxBodyBatteryLevel")
+            or day_summary.get("bodyBatteryChargedValue")
         )
         # Use summary resting HR if sleep endpoint didn't provide it
         if resting_hr is None:
