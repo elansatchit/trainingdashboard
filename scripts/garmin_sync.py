@@ -96,6 +96,9 @@ try:
         f"?calendarDate={target}"
     )
     if day_summary:
+        # Debug: print all battery-related fields
+        batt_fields = {k: v for k, v in day_summary.items() if "attery" in k or "esting" in k.lower()}
+        print(f"  Battery/HR fields: {batt_fields}")
         readiness = (
             day_summary.get("maxBodyBatteryLevel")
             or day_summary.get("bodyBatteryChargedValue")
