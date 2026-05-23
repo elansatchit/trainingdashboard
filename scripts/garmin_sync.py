@@ -42,7 +42,7 @@ for name, content in files.items():
     with open(os.path.join(token_dir, name), "w") as f:
         f.write(content)
 
-garth.load(token_dir)
+garth.client.load(token_dir)
 print("  Auth: using stored OAuth tokens")
 
 # --- Get display name (needed for sleep endpoint) ---
